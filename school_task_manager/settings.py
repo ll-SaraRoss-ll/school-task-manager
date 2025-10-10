@@ -42,7 +42,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_crontab',
+    'django_filters',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    # ... other settings
+}
 
 AUTH_USER_MODEL = 'users.CustomUser'
 
