@@ -35,11 +35,11 @@ class TaskTable(models.Model):
 
 
 class Activity(models.Model):
-    STATUS_CHOICES = (
-        ('todo', 'To Do'),
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
         ('in_progress', 'In Progress'),
-        ('done', 'Done'),
-    )
+        ('complete', 'Completed'),
+    ]
     # Make task_table nullable for incremental migration; backfill existing rows, then remove null=True if you want it required.
     task_table = models.ForeignKey(TaskTable, on_delete=models.CASCADE, related_name='activities', null=True, blank=True)
     title = models.CharField(max_length=255, null=True, blank=True)
@@ -48,7 +48,7 @@ class Activity(models.Model):
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
     resources_budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     performance_indicators = models.TextField(blank=True)
-    status = models.CharField(max_length=64, default='pending')
+    status = models.CharField(max_length=64, choices=STATUS_CHOICES, default='pending')
     next_due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

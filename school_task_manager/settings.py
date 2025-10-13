@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'users',
     'tasks',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
     'django_crontab',
     'django_filters',
@@ -48,6 +49,10 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     # ... other settings
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
 }
 
 AUTH_USER_MODEL = 'users.CustomUser'
