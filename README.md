@@ -113,3 +113,65 @@ Start dev server:
 python manage.py runserver
 
 Use the browsable API or curl to interact with endpoints (include authentication for write operations).
+
+## Features / Audit & Calendar
+TimelineEntry purpose and fields TimelineEntry records every status transition for an Activity to provide an auditable history trail. Fields: activity (FK to Activity), old_status (previous status), new_status (current status), changed_at (timestamp recorded on create), metadata (optional JSON blob for user id, IP, reason, request id).
+
+How signals log status changes and attach metadata A pre_save signal on Activity compares the instance’s status against the stored DB value and creates a TimelineEntry when the status changes. To include contextual metadata (for example, the acting user or request info), attach a dict to the Activity instance before saving:
+
+py
+instance._status_change_metadata = {'user_id': request.user.id, 'note': 'approved via UI'}
+instance.status = 'in_progress'
+instance.save()
+The signal reads instance._status_change_metadata and stores it in TimelineEntry.metadata..
+
+Calendar endpoint behavior and JSON shape The calendar endpoint returns upcoming timeline entries grouped by ISO date strings (YYYY-MM-DD) suitable for calendar UIs. Route: /api/tasks/calendar/. Response shape:
+
+json
+{
+  "2025-10-13": [
+    {"id": 1, "activity": 3, "old_status": "todo", "new_status": "in_progress", "changed_at": "2025-10-13T11:21:00Z"}
+  ],
+  "2025-10-14": [
+    {"id": 2, "activity": 4, "old_status": "in_progress", "new_status": "done", "changed_at": "2025-10-14T08:00:00Z"}
+  ]
+}
+Entries are keyed by the date portion of changed_at; each value is an array of TimelineEntry objects with the fields id, activity, old_status, new_status, changed_at.
+
+Configuration and checks
+Confirm AppConfig usage in settings Ensure INSTALLED_APPS contains the Tasks AppConfig:
+
+py
+INSTALLED_APPS = [
+  # ...
+  'tasks.apps.TasksConfig',
+  # ...
+]
+Lint, tests, and CI commands Run linting and tests locally before committing:
+
+Lint:
+
+bash
+flake8 tasks
+# or
+pylint tasks
+Run tests:
+
+bash
+python manage.py test
+Suggested git workflow and commit messages Stage, commit, and push the changes with clear messages:
+
+bash
+git add tasks/ README.md
+git commit -m "Add TimelineEntry model and logging signals"
+git add tasks/ README.md
+git commit -m "Implement /api/calendar/ endpoint and tests"
+git push origin your-branch-name
+Replace your-branch-name with the branch you are using.
+
+Developer notes (short)
+Ensure tasks/apps.TasksConfig.ready() imports tasks.signals to wire receivers.
+
+Use select_related('activity') or values() in the calendar view for performance when serializing many entries.
+
+Keep TimelineEntry.STATUS_CHOICES stable and shared with Activity via a single constant to avoid import-order issues.

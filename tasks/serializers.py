@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import TaskTable, Activity
+from .models import TimelineEntry
 
 class ActivitySerializer(serializers.ModelSerializer):
     table_title = serializers.CharField(source='task_table.title', read_only=True)
@@ -41,3 +42,8 @@ class TaskTableSerializer(serializers.ModelSerializer):
             'activities',
         ]
         read_only_fields = ['created_at', 'updated_at', 'activities']
+
+class TimelineEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TimelineEntry
+        fields = ('id', 'activity', 'old_status', 'new_status', 'changed_at')

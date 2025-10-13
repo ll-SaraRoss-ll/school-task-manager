@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from tasks.models import Task
+from tasks.models import Activity as Task
 # Create your tests here.
 
 User = get_user_model()

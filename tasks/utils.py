@@ -24,3 +24,10 @@ def get_next_term_dates(start_date: date):
     terms.append(start_date + relativedelta(months=4))
     terms.append(start_date + relativedelta(months=8))
     return terms
+
+#status comparison helper
+def status_changed(old_instance, new_instance):
+    """
+    Return True if status changed between two Activity instances.
+    """
+    return getattr(old_instance, 'status', None) != getattr(new_instance, 'status', None)
