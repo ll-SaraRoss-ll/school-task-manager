@@ -175,3 +175,91 @@ Ensure tasks/apps.TasksConfig.ready() imports tasks.signals to wire receivers.
 Use select_related('activity') or values() in the calendar view for performance when serializing many entries.
 
 Keep TimelineEntry.STATUS_CHOICES stable and shared with Activity via a single constant to avoid import-order issues.
+
+School Task Manager — Recent Update (15 Oct 2025)
+Summary
+Added two reporting endpoints (overdue and upcoming), role-based access control with Owner and Director groups, and OpenAPI/Swagger documentation via drf-spectacular.
+
+What was added
+Overdue tasks report endpoint
+
+Upcoming tasks report endpoint (configurable window via query param)
+
+Custom permission class IsOwnerOrReadOnly
+
+Management command to create Owner and Director groups with permissions
+
+drf-spectacular OpenAPI schema and Swagger UI
+
+Tests covering reports and role-based access
+
+Performance tweak: report queries use select_related to reduce DB hits
+
+Endpoints
+GET /api/tasks/reports/overdue/ Returns tasks where next_due_date or deadline is before today.
+
+GET /api/tasks/reports/upcoming/?days=N Returns tasks with next_due_date between today and today+N (default N=7).
+
+GET /api/schema/ OpenAPI JSON/YAML schema (drf-spectacular).
+
+GET /api/docs/ Interactive Swagger UI.
+
+Note: If tasks.urls is included under a different prefix in project urls.py, adjust paths accordingly (e.g., /api/reports/... vs /api/tasks/reports/...).
+
+Permissions (role-based)
+Owner group: full model-level permissions (create, read, update, delete).
+
+Director group: read-only permissions (safe methods: GET, HEAD, OPTIONS).
+
+Permission class: tasks.permissions.IsOwnerOrReadOnly applied to report and CRUD views.
+
+Setup & run (one-time & dev)
+Install schema tooling:
+
+pip install drf-spectacular
+
+Add to settings.py:
+
+INSTALLED_APPS += ['drf_spectacular']
+
+REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
+
+SPECTACULAR_SETTINGS with TITLE and VERSION
+
+Create groups and assign permissions:
+
+python manage.py create_groups
+
+Or use Django admin (Groups) to inspect/modify Owner and Director.
+
+Create or assign users to groups:
+
+Use admin or a management command; use get_user_model() if scripting.
+
+Run server:
+
+python manage.py runserver
+
+Visit docs and test:
+
+http://127.0.0.1:8000/api/schema/
+
+http://127.0.0.1:8000/api/docs/
+
+Reports: http://127.0.0.1:8000/api/tasks/reports/overdue/ and /upcoming/?days=14
+
+Testing
+Tests added at tasks/tests/test_reports_permissions.py
+
+Run:
+
+python manage.py test tasks
+
+Implementation notes
+Report serializers: OverdueTaskSerializer and UpcomingTaskSerializer (fields: id, title, task_table, assigned_to, next_due_date, status).
+
+Views: OverdueTasksReportView and UpcomingTasksReportView use select_related('task_table','assigned_to').
+
+If Activity has a deadline field, overdue includes next_due_date OR deadline comparisons.
+
+drf-spectacular may warn for APIViews without serializer_class (example: CalendarView). Convert to GenericAPIView/ListAPIView or set serializer_class to tidy schema output.
