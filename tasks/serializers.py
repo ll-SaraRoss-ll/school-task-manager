@@ -47,3 +47,27 @@ class TimelineEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimelineEntry
         fields = ('id', 'activity', 'old_status', 'new_status', 'changed_at')
+
+class OverdueTaskSerializer(serializers.ModelSerializer):
+    task_table = serializers.PrimaryKeyRelatedField(read_only=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Activity
+        fields = ['id', 'title', 'task_table', 'assigned_to', 'next_due_date', 'status']
+        extra_kwargs = {
+            'next_due_date': {'help_text': 'Next calculated due date for recurring tasks'},
+            'status': {'help_text': 'Current status of the task'}
+        }
+
+class UpcomingTaskSerializer(serializers.ModelSerializer):
+    task_table = serializers.PrimaryKeyRelatedField(read_only=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Activity
+        fields = ['id', 'title', 'task_table', 'assigned_to', 'next_due_date', 'status']
+        extra_kwargs = {
+            'next_due_date': {'help_text': 'Next due date inside the upcoming window'},
+            'status': {'help_text': 'Current status of the task'}
+        }
