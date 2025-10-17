@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-school_task_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - stm-net
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # ensure scheduler is disabled in the web worker
+      RUN_SCHEDULER: "False"
+    volumes:
+      - .:/app:cached
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn school_task_manager.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    networks:
+      - stm-net
+
+  scheduler:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # only this service should run the APScheduler
+      RUN_SCHEDULER: "True"
+    volumes:
+      - .:/app:cached
+    depends_on:
+      - db
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             # A persistent Django process so AppConfig.ready() can start APScheduler.
+             python manage.py runserver 0.0.0.0:8001"
+    networks:
+      - stm-net
+
+volumes:
+  postgres_data:
+
+networks:
+  stm-net:

@@ -1,0 +1,11 @@
+Subject: Reminder: {{ activity.title }}
+
+Hello {{ user.get_full_name }},
+
+This is a reminder for the activity: {{ activity.title }}.
+Next due date: {{ activity.next_due_date }}
+
+Please visit your dashboard to view details and update the status.
+
+Thanks,
+The Team

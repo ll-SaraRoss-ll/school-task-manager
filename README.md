@@ -1,265 +1,263 @@
-# School Task Manager: 
-A lightweight backend for managing school tasks and activities. Built with Django and SQLite for solo or low-traffic use.
+School Task Manager
+A lightweight Django REST backend for managing school tasks and activities. Built for solo or low-traffic use with SQLite locally and PostgreSQL recommended for production. Includes activity reminders, timeline auditing, calendar feed, role-based permissions, and OpenAPI docs.
 
-# Setup Instructions
-1. Clone the repo
+Quick start (run locally)
+Clone
+
 bash
 git clone https://github.com/ll-SaraRoss-ll/school-task-manager.git
 cd school-task-manager
+Create and activate virtualenv
 
-2. Create and activate virtualenv
 bash
 python -m venv venv
-source venv/Scripts/activate  # Windows Git Bash
+# macOS / Linux
+source venv/bin/activate
+# Windows Git Bash
+source venv/Scripts/activate
+Install dependencies
 
-3. Install dependencies
 bash
-pip install django djangorestframework django-cors-headers django-crontab
+pip install -r requirements.txt
+Create .env (project root) — example values
 
-4. Run migrations
+Code
+DJANGO_SECRET_KEY=replace-with-a-secret
+DJANGO_DEBUG=True
+DJANGO_ENV=development
+DJANGO_TIME_ZONE=Africa/Addis_Ababa
+REMINDER_WINDOW_DAYS=1
+RUN_SCHEDULER=False
+
+# DB (for production use a proper DATABASE_URL or Postgres)
+POSTGRES_DB=school_task_manager
+POSTGRES_USER=db_user
+POSTGRES_PASSWORD=db_password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+
+# Email (SendGrid example). For local dev use locmem backend instead.
+SENDGRID_API_KEY=SG.xxxxx
+DEFAULT_FROM_EMAIL=noreply@yourdomain.com
+SERVER_EMAIL=server@yourdomain.com
+
+# Optional for deploy.sh
+VENV_PATH=/absolute/path/to/venv
+Add .env to .gitignore:
+
+Code
+.env
+Apply database migrations
+
 bash
 python manage.py makemigrations
 python manage.py migrate
+Create a superuser (optional)
 
-5. Start development server
+bash
+python manage.py createsuperuser
+Run the development server
+
 bash
 python manage.py runserver
+Visit the API
 
-# Testing
+Browsable API root or DRF endpoints, e.g. http://127.0.0.1:8000/api/tasks/
+
+Swagger UI: http://127.0.0.1:8000/api/docs/
+
+Schema JSON/YAML: http://127.0.0.1:8000/api/schema/
+
+Environment and configuration
+settings driven by environment variables in .env.
+
+Key env variables: DJANGO_SECRET_KEY, DJANGO_DEBUG, TIME_ZONE, REMINDER_WINDOW_DAYS, RUN_SCHEDULER, SENDGRID_API_KEY, DEFAULT_FROM_EMAIL.
+
+For local testing set:
+
+DJANGO_DEBUG=True
+
+EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend
+
+TIME_ZONE should match your server timezone so scheduled jobs using TIME_ZONE run at the intended hour.
+
+Scheduler (APScheduler)
+We use django-apscheduler for cross-platform scheduling.
+
+Enable scheduler in production by setting RUN_SCHEDULER=True.
+
+The scheduled job runs the management command send_task_reminders daily at 08:00 server time (configurable by editing tasks/apscheduler.py CronTrigger).
+
+To avoid multiple scheduler instances, only enable RUN_SCHEDULER on one process (or run a single dedicated scheduler worker).
+
+Quick checks:
+
 bash
-python manage.py test
+# start server with scheduler enabled
+RUN_SCHEDULER=True python manage.py runserver
 
-# Notes
-Database: SQLite (db.sqlite3)
+# disable scheduler during tests
+RUN_SCHEDULER=False python manage.py test
+Reminder emails
+Templates: tasks/templates/tasks/reminder_email.txt and reminder_email.html.
 
-API: Django REST Framework
+Management command: python manage.py send_task_reminders
 
-Cron jobs: Email reminders via django-crontab
+Uses REMINDER_WINDOW_DAYS to compute reminder date.
 
+Queries activities with next_due_date == today + REMINDER_WINDOW_DAYS and status in pending/in-progress.
 
-## Key implementation details
-Models
+Sends plain-text + HTML to activity.assigned_to.email.
 
-TaskTable: title, description, timeline, assigned_to (FK to user), resources_budget (JSON), performance_indicators, status, created_at, updated_at.
+For provider integration use Anymail (Mailgun recommended) or the SendGrid SDK. For local testing use locmem or console backend.
 
-Activity: task_table (FK to TaskTable; temporarily nullable during migration), title, description, timeline, assigned_to, resources_budget, performance_indicators, status, next_due_date, created_at, updated_at.
+Endpoints (high level)
+All endpoints are mounted under the tasks API prefix (adjust if your project urls differ).
 
-Activity.save() calculates and sets next_due_date for recurring timelines using utils functions.
+TaskTables
 
-Migrations
+GET /api/tasks/tables/ — list
 
-Reviewed and reconciled tasks/migrations/0001_initial.py and 0002_initial.py.
+POST /api/tasks/tables/ — create (assigned_to set server-side)
 
-Added explicit rename operations or temporary-null migrations to avoid interactive makemigrations prompts.
+GET/PUT/DELETE /api/tasks/tables/{id}/ — retrieve/update/delete
 
-Backfilled missing FK and title values in the DB before making fields non-nullable.
+Activities
 
-API behavior
+GET /api/tasks/activities/ — list
 
-TaskTable creation is performed server-side with assigned_to set to the authenticated user.
-
-TaskTableSerializer exposes assigned_to as read-only so clients cannot spoof ownership.
-
-Viewsets use DRF permissions; authenticated access is required for writes.
-
-Public API endpoints (development)
-All endpoints are mounted under /api/tasks/ (adjust if your project-level urls.py mounts differently).
-
-List TaskTables
-
-GET /api/tasks/tables/
-
-Create TaskTable
-
-POST /api/tasks/tables/
-
-Required fields: title (string), timeline (one of: one-off, yearly, quarterly, term) — assigned_to is set from the authenticated user
-
-Retrieve / Update / Delete TaskTable
-
-GET/PUT/DELETE /api/tasks/tables/{id}/
-
-List Activities
-
-GET /api/tasks/activities/
-
-Create Activity
-
-POST /api/tasks/activities/
-
-Provide task_table (id), title, timeline, etc. next_due_date is auto-calculated for recurring timelines
-
-Retrieve / Update / Delete Activity
+POST /api/tasks/activities/ — create (next_due_date auto-calculated for recurring timelines)
 
 GET/PUT/DELETE /api/tasks/activities/{id}/
 
-Authentication: use Django session login (browsable API) or basic/token auth for development. The browsable API login is available at /api-auth/login/.
+Calendar
 
-How to run locally (quick)
-Create and activate your virtualenv, install requirements.
+GET /api/tasks/calendar/ — returns timeline entries grouped by date (YYYY-MM-DD) suitable for calendar UIs
 
-Apply migrations:
+Reports
 
-python manage.py makemigrations
+GET /api/tasks/reports/overdue/
 
-python manage.py migrate
+GET /api/tasks/reports/upcoming/?days=N
 
-Create a superuser if needed:
+Docs
 
-python manage.py createsuperuser
+GET /api/schema/
 
-Start dev server:
+GET /api/docs/
 
-python manage.py runserver
+Authentication
 
-Use the browsable API or curl to interact with endpoints (include authentication for write operations).
+Session auth (browsable API) and TokenAuthentication available for API use. Writes require authentication.
 
-## Features / Audit & Calendar
-TimelineEntry purpose and fields TimelineEntry records every status transition for an Activity to provide an auditable history trail. Fields: activity (FK to Activity), old_status (previous status), new_status (current status), changed_at (timestamp recorded on create), metadata (optional JSON blob for user id, IP, reason, request id).
+Models & behavior (concise)
+TaskTable: title, description, timeline, assigned_to (FK), resources_budget (JSON), performance_indicators, status, timestamps.
 
-How signals log status changes and attach metadata A pre_save signal on Activity compares the instance’s status against the stored DB value and creates a TimelineEntry when the status changes. To include contextual metadata (for example, the acting user or request info), attach a dict to the Activity instance before saving:
+Activity: FK to TaskTable, title, timeline, assigned_to, resources_budget, status, next_due_date, timestamps.
+
+TimelineEntry: records status transitions (activity FK, old_status, new_status, changed_at, metadata JSON).
+
+Activity.save() computes next_due_date for recurring timelines using utility functions.
+
+Signals: Activity change signal creates TimelineEntry when status changes. Attach instance._status_change_metadata before save to include context.
+
+Example to attach metadata before changing status:
 
 py
 instance._status_change_metadata = {'user_id': request.user.id, 'note': 'approved via UI'}
 instance.status = 'in_progress'
 instance.save()
-The signal reads instance._status_change_metadata and stores it in TimelineEntry.metadata..
-
-Calendar endpoint behavior and JSON shape The calendar endpoint returns upcoming timeline entries grouped by ISO date strings (YYYY-MM-DD) suitable for calendar UIs. Route: /api/tasks/calendar/. Response shape:
-
-json
-{
-  "2025-10-13": [
-    {"id": 1, "activity": 3, "old_status": "todo", "new_status": "in_progress", "changed_at": "2025-10-13T11:21:00Z"}
-  ],
-  "2025-10-14": [
-    {"id": 2, "activity": 4, "old_status": "in_progress", "new_status": "done", "changed_at": "2025-10-14T08:00:00Z"}
-  ]
-}
-Entries are keyed by the date portion of changed_at; each value is an array of TimelineEntry objects with the fields id, activity, old_status, new_status, changed_at.
-
-Configuration and checks
-Confirm AppConfig usage in settings Ensure INSTALLED_APPS contains the Tasks AppConfig:
-
-py
-INSTALLED_APPS = [
-  # ...
-  'tasks.apps.TasksConfig',
-  # ...
-]
-Lint, tests, and CI commands Run linting and tests locally before committing:
-
-Lint:
-
-bash
-flake8 tasks
-# or
-pylint tasks
+Tests & QA
 Run tests:
 
 bash
-python manage.py test
-Suggested git workflow and commit messages Stage, commit, and push the changes with clear messages:
+# disable scheduler for tests
+RUN_SCHEDULER=False python manage.py test
+Notification tests:
+
+Use django.core.mail.backends.locmem.EmailBackend or override settings in tests.
+
+Assert len(mail.outbox) equals expected emails and check subject/body content and HTML alternative.
+
+Manual QA checklist:
+
+Create an activity due tomorrow → run send_task_reminders or wait for scheduler at 08:00, confirm email arrival.
+
+Confirm no emails for tasks outside the reminder window.
+
+Confirm calendar endpoint groups entries by date.
+
+Confirm TimelineEntry records appear after status transitions, and metadata saved when provided.
+
+Confirm API permissions (Owner vs Director groups).
+
+Deployment (deploy.sh)
+Place deploy.sh at project root (next to manage.py). Basic usage:
+
+Make executable:
 
 bash
-git add tasks/ README.md
-git commit -m "Add TimelineEntry model and logging signals"
-git add tasks/ README.md
-git commit -m "Implement /api/calendar/ endpoint and tests"
-git push origin your-branch-name
-Replace your-branch-name with the branch you are using.
+chmod +x deploy.sh
+Run it:
 
-Developer notes (short)
-Ensure tasks/apps.TasksConfig.ready() imports tasks.signals to wire receivers.
+bash
+./deploy.sh
+What deploy.sh does
 
-Use select_related('activity') or values() in the calendar view for performance when serializing many entries.
+Loads .env if present
 
-Keep TimelineEntry.STATUS_CHOICES stable and shared with Activity via a single constant to avoid import-order issues.
+Optionally activates virtualenv if VENV_PATH is set
 
-School Task Manager — Recent Update (15 Oct 2025)
-Summary
-Added two reporting endpoints (overdue and upcoming), role-based access control with Owner and Director groups, and OpenAPI/Swagger documentation via drf-spectacular.
+Runs python manage.py migrate
 
-What was added
-Overdue tasks report endpoint
+Runs python manage.py collectstatic --no-input
 
-Upcoming tasks report endpoint (configurable window via query param)
+Attempts python manage.py crontab add only if django-crontab is installed (guarded)
 
-Custom permission class IsOwnerOrReadOnly
+Prints progress and exits non-zero on error
 
-Management command to create Owner and Director groups with permissions
+Notes for production
 
-drf-spectacular OpenAPI schema and Swagger UI
+Use a proper secret storage instead of .env for production (hosting secret manager).
 
-Tests covering reports and role-based access
+Use Postgres and set DATABASE_URL or DB_* env variables.
 
-Performance tweak: report queries use select_related to reduce DB hits
+Run the scheduler in a single dedicated process or use a separate process for the scheduler.
 
-Endpoints
-GET /api/tasks/reports/overdue/ Returns tasks where next_due_date or deadline is before today.
+Use gunicorn/uvicorn + systemd or container orchestration for production.
 
-GET /api/tasks/reports/upcoming/?days=N Returns tasks with next_due_date between today and today+N (default N=7).
+Docker (optional)
 
-GET /api/schema/ OpenAPI JSON/YAML schema (drf-spectacular).
+Use a docker-compose setup that runs migrations and collectstatic in the container start-up step; adapt deploy.sh accordingly.
 
-GET /api/docs/ Interactive Swagger UI.
+Git workflow & release
+Suggested workflow
 
-Note: If tasks.urls is included under a different prefix in project urls.py, adjust paths accordingly (e.g., /api/reports/... vs /api/tasks/reports/...).
+bash
+git checkout -b feature/notifications
+git add .
+git commit -m "Implement send_task_reminders and APScheduler integration"
+git push origin feature/notifications
+Tag release
 
-Permissions (role-based)
-Owner group: full model-level permissions (create, read, update, delete).
+bash
+git tag -a v1.0.0 -m "Release: notifications & scheduling complete"
+git push origin main
+git push --tags
+Troubleshooting (common issues)
+ModuleNotFoundError: anymail — install pip install django-anymail or switch EMAIL_BACKEND to locmem/console for dev.
 
-Director group: read-only permissions (safe methods: GET, HEAD, OPTIONS).
+fcntl on Windows — django-crontab is Unix-only; use APScheduler (implemented) or Windows Task Scheduler.
 
-Permission class: tasks.permissions.IsOwnerOrReadOnly applied to report and CRUD views.
+Duplicate scheduled jobs — ensure RUN_SCHEDULER=True only on one process or use dedicated scheduler worker.
 
-Setup & run (one-time & dev)
-Install schema tooling:
+Emails not delivered — verify SENDGRID_API_KEY/MAILGUN credentials and DEFAULT_FROM_EMAIL.
 
-pip install drf-spectacular
+Implementation notes for developers
+Ensure tasks.apps.TasksConfig.ready() imports tasks.signals.
 
-Add to settings.py:
+Use select_related for calendar and report endpoints to reduce DB hits.
 
-INSTALLED_APPS += ['drf_spectacular']
+Keep TimelineEntry.STATUS_CHOICES stable and shared across models.
 
-REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
-
-SPECTACULAR_SETTINGS with TITLE and VERSION
-
-Create groups and assign permissions:
-
-python manage.py create_groups
-
-Or use Django admin (Groups) to inspect/modify Owner and Director.
-
-Create or assign users to groups:
-
-Use admin or a management command; use get_user_model() if scripting.
-
-Run server:
-
-python manage.py runserver
-
-Visit docs and test:
-
-http://127.0.0.1:8000/api/schema/
-
-http://127.0.0.1:8000/api/docs/
-
-Reports: http://127.0.0.1:8000/api/tasks/reports/overdue/ and /upcoming/?days=14
-
-Testing
-Tests added at tasks/tests/test_reports_permissions.py
-
-Run:
-
-python manage.py test tasks
-
-Implementation notes
-Report serializers: OverdueTaskSerializer and UpcomingTaskSerializer (fields: id, title, task_table, assigned_to, next_due_date, status).
-
-Views: OverdueTasksReportView and UpcomingTasksReportView use select_related('task_table','assigned_to').
-
-If Activity has a deadline field, overdue includes next_due_date OR deadline comparisons.
-
-drf-spectacular may warn for APIViews without serializer_class (example: CalendarView). Convert to GenericAPIView/ListAPIView or set serializer_class to tidy schema output.
+Use REMINDER_WINDOW_DAYS env var to control reminder timing.

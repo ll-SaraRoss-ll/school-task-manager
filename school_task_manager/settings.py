@@ -11,19 +11,29 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from datetime import timedelta
+from django.utils import timezone
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ua^hg0gh!*4@8(8)0n4jgsn=@g171hr1^wxc67a41jfnm)#t8c'
+#SECRET_KEY = 'django-insecure-ua^hg0gh!*4@8(8)0n4jgsn=@g171hr1^wxc67a41jfnm)#t8c'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+#DEBUG = True
+
+# security / environment
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-placeholder")
+DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
+
+# reminder window (days)
+REMINDER_WINDOW_DAYS = int(os.environ.get("REMINDER_WINDOW_DAYS", "1"))
+
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -42,10 +52,28 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'anymail',
     'django_crontab',
     'django_filters',
     'drf_spectacular',
+    'django_apscheduler',
 ]
+# Email backend
+EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+
+ANYMAIL = {
+    "SENDGRID_API_KEY": os.environ.get("SENDGRID_API_KEY"),
+    # Optional: set SENDGRID_API_URL for self-hosted or different endpoint
+}
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+
+# Optional: fail loudly in production but allow silent send in tests
+EMAIL_FAIL_SILENTLY = False
+
+REMINDER_WINDOW_DAYS = int(os.environ.get("REMINDER_WINDOW_DAYS", "1"))
+
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
@@ -80,8 +108,12 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CRONJOBS = [
-    ('0 8 * * *', 'tasks.management.commands.send_reminders')
+    ("0 8 * * *", "django.core.management.call_command", ["send_task_reminders"]),
 ]
+
+#CRONJOBS = [
+#    ('0 8 * * *', 'tasks.management.commands.send_reminders')
+#]
 
 ROOT_URLCONF = 'school_task_manager.urls'
 
@@ -95,10 +127,12 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
             ],
         },
     },
 ]
+
 
 WSGI_APPLICATION = 'school_task_manager.wsgi.application'
 
@@ -136,9 +170,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+RUN_SCHEDULER=True
+REMINDER_WINDOW_DAYS=1
+
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "Africa/Addis_Ababa")
 
 USE_I18N = True
 
@@ -154,3 +191,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django_apscheduler": {"handlers": ["console"], "level": "INFO"}},
+}
+

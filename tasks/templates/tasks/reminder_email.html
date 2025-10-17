@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Reminder: {{ activity.title }}</title>
+  </head>
+  <body>
+    <h2>Reminder: {{ activity.title }}</h2>
+    <p>Hello {{ user.get_full_name }},</p>
+    <p>This is a reminder for the activity <strong>{{ activity.title }}</strong>.</p>
+    <p><strong>Next due date:</strong> {{ activity.next_due_date }}</p>
+    <p><a href="{{ activity.get_absolute_url }}">Open activity in the app</a></p>
+    <p>Thanks,<br/>The Team</p>
+  </body>
+</html>
