@@ -14,6 +14,8 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from django.utils import timezone
+from django.core.exceptions import ImproperlyConfigured
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,25 +23,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-#SECRET_KEY = 'django-insecure-ua^hg0gh!*4@8(8)0n4jgsn=@g171hr1^wxc67a41jfnm)#t8c'
-
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True
-
 # security / environment
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-placeholder")
-DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
+
+# Secret
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY environment variable is required")
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
 # reminder window (days)
 REMINDER_WINDOW_DAYS = int(os.environ.get("REMINDER_WINDOW_DAYS", "1"))
 
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Allowed hosts (use your actual Render service name below)
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,school-task-manager.onrender.com").split(",")]
 
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,13 +54,12 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'anymail',
-    'django_crontab',
     'django_filters',
     'drf_spectacular',
     'django_apscheduler',
 ]
 # Email backend
-EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "anymail.backends.sendgrid.EmailBackend")
 
 ANYMAIL = {
     "SENDGRID_API_KEY": os.environ.get("SENDGRID_API_KEY"),
@@ -107,13 +107,6 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
 ]
 
-CRONJOBS = [
-    ("0 8 * * *", "django.core.management.call_command", ["send_task_reminders"]),
-]
-
-#CRONJOBS = [
-#    ('0 8 * * *', 'tasks.management.commands.send_reminders')
-#]
 
 ROOT_URLCONF = 'school_task_manager.urls'
 
@@ -140,12 +133,20 @@ WSGI_APPLICATION = 'school_task_manager.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database: prefer DATABASE_URL for Postgres in production, fall back to sqlite for local dev
+import dj_database_url
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -170,8 +171,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-RUN_SCHEDULER=True
-REMINDER_WINDOW_DAYS=1
+# Scheduler toggle
+RUN_SCHEDULER = os.environ.get("RUN_SCHEDULER", "False") == "True"
 
 LANGUAGE_CODE = 'en-us'
 
@@ -186,6 +187,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
